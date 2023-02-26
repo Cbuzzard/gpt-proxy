@@ -32,7 +32,7 @@ func main() {
 
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 	http.HandleFunc("/", handler(proxy))
-	err = http.ListenAndServe(port, nil)
+	err = http.ListenAndServe(fmt.Sprintf(":%v", port), nil)
 	if err != nil {
 		panic(err)
 	}
