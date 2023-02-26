@@ -1,29 +1,39 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
-
-	"github.com/gin-gonic/gin"
-	_ "github.com/heroku/x/hmetrics/onload"
 )
 
 func main() {
 	port := os.Getenv("PORT")
+	API_KEY := os.Getenv("API_KEY")
 
 	if port == "" {
 		log.Fatal("$PORT must be set")
 	}
 
-	router := gin.New()
-	router.Use(gin.Logger())
-	router.LoadHTMLGlob("templates/*.tmpl.html")
-	router.Static("/static", "static")
+	remote, err := url.Parse("https://api.openai.com/v1/completions")
+	if err != nil {
+		panic(err)
+	}
 
-	router.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index.tmpl.html", nil)
-	})
+	handler := func(p *httputil.ReverseProxy) func(http.ResponseWriter, *http.Request) {
+		return func(w http.ResponseWriter, r *http.Request) {
+			r.Host = remote.Host
+			w.Header().Set("Authorization", fmt.Sprintf("Bearer %v", API_KEY))
+			p.ServeHTTP(w, r)
+		}
+	}
 
-	router.Run(":" + port)
+	proxy := httputil.NewSingleHostReverseProxy(remote)
+	http.HandleFunc("/", handler(proxy))
+	err = http.ListenAndServe(port, nil)
+	if err != nil {
+		panic(err)
+	}
 }
